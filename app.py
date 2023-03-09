@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings('ignore')
 import numpy as np
 import datetime as dt
 import sqlalchemy
@@ -7,11 +9,11 @@ from sqlalchemy import create_engine, func
 
 from flask import Flask, jsonify
 
-engine = create_engine("sqlite:///hawaii.sqlite")
+engine = create_engine("sqlite:///starter_code/Resources/hawaii.sqlite")
 
 Base = automap_base()
 
-Base.prepare(engine, reflect=True)
+Base.prepare(autoload_with=engine)
 
 measurement = Base.classes.measurement
 station = Base.classes.station
@@ -22,12 +24,12 @@ app = Flask(__name__)
 def welcome():
     """List all available api routes."""
     return (
-            f"Available Routes:<br/"
-            f"/api/v1.0/precipitation<br/>"
-            f"/api/v1.0/stations<br/>"
-            f"/api/v1.0/tobs"
-            f"/api/v1.0/<start>"
-            f"/api/v1.0/<start>/<end>"
+            f"Available Routes:<br/>"
+            f"Precipitation: /api/v1.0/precipitation<br/>"
+            f"Stations: /api/v1.0/stations<br/>"
+            f"Temperature for one year: /api/v1.0/tobs<br/>"
+            f"Temperature from start date(yyy-mm-dd): /api/v1.0/yyyy-mm-dd<br/>"
+            f"Temperature from start to end date(yyyy-mm-dd): /api/v1.0/yyyy-mm-dd/yyyy-mm-dd"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -48,26 +50,26 @@ def precipitation():
     return jsonify(values)  
 
 @app.route("/api/v1.0/stations")
-def station():
+def stations():
     session = Session(engine)
     """Return a list of all stations"""
-    station_results = session.query(session.query(station.station, station.id).all()
+    station_results = session.query(measurement.id, measurement.station).all()
     session.close()
     station_values = []
-    for station, id in station_results:
+    for id, station in station_results:
         station_dict = {}
-        station_dict["station"] = station
         station_dict["id"] = id
+        station_dict["station"] = station
         station_values.append(station_dict)
 
-    return jsonify(stations)  
+    return jsonify(station_values)  
 
 @app.route("/api/v1.0/tobs")
 def tobs():
     session = Session(engine)
     """Return a list of dates and temperatures for the last 12 months of data"""
     last_year_results= session.query(measurement.date).\
-        order_by(measurement.date).desc()).first()
+        order_by(measurement.date).first()
     print(last_year_results)
     last_year_values = []
     for date in last_year_results:
@@ -96,7 +98,7 @@ def tobs():
 
     return jsonify(active_last_year_values) 
 
-@app.route("api/v1.0/<start>")
+@app.route("/api/v1.0/<start>")
 def start_date(start):
     session = Session(engine)
     """Return a list of min, max and average temperatures for a given date"""
@@ -104,7 +106,7 @@ def start_date(start):
         filter(measurement.date >= start).all()
     session.close()
     start_values = []
-    for min, avg, max in results:
+    for min, avg, max in start_results:
         start_dict = {}
         start_dict["min"] = min
         start_dict["avg"] = avg
@@ -122,7 +124,7 @@ def start_end_date(start, end):
         filter(measurement.date<= end).all()
     session.close()
     start_end_values = []
-    for min, avg, max in results:
+    for min, avg, max in start_end_results:
         start_end_dict = {}
         start_end_dict["min"] = min
         start_end_dict["avg"] = avg
